@@ -18,11 +18,12 @@ import { getKubeloginBinaryPath } from "./helper/kubeloginDownload";
 import { longRunning } from "./host";
 import { dirSync } from "tmp";
 import { ReadyAzureSessionProvider, TokenInfo } from "../../auth/types";
-import { AuthenticationSession, authentication } from "vscode";
+import { AuthenticationSession, QuickPickItem, authentication, window } from "vscode";
 import { getTokenInfo } from "../../auth/azureAuth";
 import { getAksClient } from "./arm";
 import { withOptionalTempFile } from "./tempfile";
 import { invokeKubectlCommand } from "./kubectl";
+import { getResources } from "./azureResources";
 
 export interface KubernetesClusterInfo {
     readonly name: string;
@@ -569,4 +570,61 @@ export async function filterPodName(
 
 function isDefinedManagedCluster(cluster: azcs.ManagedCluster): cluster is DefinedManagedCluster {
     return cluster.id !== undefined && cluster.name !== undefined && cluster.location !== undefined;
+}
+
+type Cluster = {
+    name: string;
+    clusterId: string;
+    resourceGroup: string;
+    subscriptionId: string;
+}
+
+export async function getClusters(sessionProvider:ReadyAzureSessionProvider, subscriptionId: string) : Promise<Cluster[]> {
+    const clusters = await getResources(
+        sessionProvider,
+        subscriptionId,
+        "Microsoft.ContainerService/managedClusters",
+    );
+    if (failed(clusters)) {
+        window.showErrorMessage(clusters.error);
+        return [];
+    }
+
+    return clusters.result.map((cluster) => {
+        return {
+            name: cluster.name,
+            clusterId: cluster.id,
+            resourceGroup: cluster.resourceGroup,
+            subscriptionId: subscriptionId,
+        };
+    });
+}
+
+type ClusterQuickPickItem = QuickPickItem & { cluster: Cluster };
+
+export async function selectCluster(clusters: Cluster[]): Promise<ClusterQuickPickItem|undefined> {
+
+    const quickPickItems: ClusterQuickPickItem[] = clusters.map((cluster) => {
+        return {
+            label: cluster.name || "",
+            description: cluster.clusterId,
+            cluster: {
+                clusterId: cluster.clusterId,
+                name: cluster.name,
+                resourceGroup: cluster.resourceGroup,
+                subscriptionId: cluster.subscriptionId
+            }
+        };
+    });
+
+    const selectedItem = await window.showQuickPick(quickPickItems, {
+        canPickMany: false,
+        placeHolder: "Select Cluster",
+    });
+
+    if (!selectedItem) {
+        return undefined;
+    }
+    
+    return selectedItem;
 }
