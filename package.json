@@ -617,7 +617,8 @@
         "sinon": "^18.0.0",
         "tmp": "^0.2.3",
         "uuid": "^10.0.0",
-        "vscode-kubernetes-tools-api": "^1.0.0"
+        "vscode-kubernetes-tools-api": "^1.0.0",
+        "vscode-tas-client": "^0.1.84"
     },
     "repository": {
         "type": "git",

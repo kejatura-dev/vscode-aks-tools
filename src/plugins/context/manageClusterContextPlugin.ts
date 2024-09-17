@@ -5,16 +5,17 @@ import { getReadySessionProvider } from "../../auth/azureAuth";
 import * as k8s from "vscode-kubernetes-tools-api";
 import { selectSubscriptions } from "../../commands/aksAccount/aksAccount";
 import { getFilteredSubscriptions } from "../../commands/utils/config";
-import { getClusters, getKubeconfigYaml, getManagedCluster, selectCluster } from "../../commands/utils/clusters";
+import { getClusters, getKubeconfigYaml, getManagedCluster } from "../../commands/utils/clusters";
 import { longRunning } from "../../commands/utils/host";
 import { CurrentClusterContext } from "../shared/types";
-import { createTempFile } from "../../commands/utils/tempfile";
+import { createTempFile, TempFile } from "../../commands/utils/tempfile";
 import * as fs from "fs/promises";
+import { selectCluster } from "../../commands/githubCopilot/selectors";
 
 const setClusterContextFunctionName = "setClusterContext";
 const showClusterContextFunctionName = "showClusterContext";
 
-const manageClusterContextPluginManifest: LocalPluginManifest = {
+export const manageClusterContextPluginManifest: LocalPluginManifest = {
     name: "manageClusterContextPlugin",
     version: "1.0.0",
     functions: [
@@ -37,7 +38,7 @@ const manageClusterContextPluginManifest: LocalPluginManifest = {
     ]
 };
 
-let FILEPATH: string | undefined = undefined;
+let TEMPFILE: TempFile | undefined = undefined;
 
 const manageClusterContextPluginHandler: ILocalPluginHandler = {
     execute: async (args: LocalPluginArgs) => {
@@ -55,6 +56,11 @@ const manageClusterContextPluginHandler: ILocalPluginHandler = {
             if (!kubectl.available) {
                 vscode.window.showWarningMessage(`Kubectl is unavailable.`);
                 return { status: "error", message: "Kubectl is unavailable." };
+            }
+
+            // if temp file exists, dispose it
+            if(TEMPFILE) {
+                TEMPFILE.dispose();
             }
 
             // allow user to select subscriptions
@@ -108,18 +114,17 @@ const manageClusterContextPluginHandler: ILocalPluginHandler = {
                 kubeConfigYAML: kubeconfigYaml.result,
             };
 
-            const file = await createTempFile(JSON.stringify(currentCluster), "json", "current-cluster");
-            FILEPATH = file.filePath;
+            TEMPFILE = await createTempFile(JSON.stringify(currentCluster), "json", "current-cluster");
 
             return { status: "success", message: `Cluster ${selectedCluster.cluster.name} is set as current cluster.` };
 
         } else if (pluginRequest.functionName === showClusterContextFunctionName) {
 
-            if (!FILEPATH) {
+            if (!TEMPFILE) {
                 return { status: "error", message: "Current cluster is not set." };
             }
 
-            const fileContent = await fs.readFile(FILEPATH, "utf-8");
+            const fileContent = await fs.readFile(TEMPFILE.filePath, "utf-8");
             const parsedCurrentCluster = JSON.parse(fileContent) as CurrentClusterContext;
 
             return { status: "success", message: `Current cluster : ${parsedCurrentCluster.clusterName}, resource group: ${parsedCurrentCluster.resourceGroup}, subscription: ${parsedCurrentCluster.subscriptionId}` };

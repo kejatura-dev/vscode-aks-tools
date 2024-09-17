@@ -18,7 +18,7 @@ import { getKubeloginBinaryPath } from "./helper/kubeloginDownload";
 import { longRunning } from "./host";
 import { dirSync } from "tmp";
 import { ReadyAzureSessionProvider, TokenInfo } from "../../auth/types";
-import { AuthenticationSession, QuickPickItem, authentication, window } from "vscode";
+import { AuthenticationSession, authentication, window } from "vscode";
 import { getTokenInfo } from "../../auth/azureAuth";
 import { getAksClient } from "./arm";
 import { withOptionalTempFile } from "./tempfile";
@@ -572,7 +572,7 @@ function isDefinedManagedCluster(cluster: azcs.ManagedCluster): cluster is Defin
     return cluster.id !== undefined && cluster.name !== undefined && cluster.location !== undefined;
 }
 
-type Cluster = {
+export type Cluster = {
     name: string;
     clusterId: string;
     resourceGroup: string;
@@ -598,33 +598,4 @@ export async function getClusters(sessionProvider:ReadyAzureSessionProvider, sub
             subscriptionId: subscriptionId,
         };
     });
-}
-
-type ClusterQuickPickItem = QuickPickItem & { cluster: Cluster };
-
-export async function selectCluster(clusters: Cluster[]): Promise<ClusterQuickPickItem|undefined> {
-
-    const quickPickItems: ClusterQuickPickItem[] = clusters.map((cluster) => {
-        return {
-            label: cluster.name || "",
-            description: cluster.clusterId,
-            cluster: {
-                clusterId: cluster.clusterId,
-                name: cluster.name,
-                resourceGroup: cluster.resourceGroup,
-                subscriptionId: cluster.subscriptionId
-            }
-        };
-    });
-
-    const selectedItem = await window.showQuickPick(quickPickItems, {
-        canPickMany: false,
-        placeHolder: "Select Cluster",
-    });
-
-    if (!selectedItem) {
-        return undefined;
-    }
-    
-    return selectedItem;
 }

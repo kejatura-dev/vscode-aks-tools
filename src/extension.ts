@@ -48,6 +48,7 @@ import { AksClusterTreeNode } from "./tree/aksClusterTreeItem";
 import { createAzureAccountTreeItem } from "./tree/azureAccountTreeItem";
 import { AzureResourceNodeContributor } from "./tree/azureResourceNodeContributor";
 import { getPlugins } from "./plugins/getPlugins";
+import { getExperimentationService } from "./services/experimentation";
 
 export async function activate(context: vscode.ExtensionContext) {
     const cloudExplorer = await k8s.extension.cloudExplorer.v1;
@@ -57,6 +58,8 @@ export async function activate(context: vscode.ExtensionContext) {
     // Create and register the Azure session provider before accessing it.
     activateAzureSessionProvider(context);
     const sessionProvider = getSessionProvider();
+
+    const experiementService = await getExperimentationService(context);
 
     if (cloudExplorer.available) {
         // NOTE: This is boilerplate configuration for the Azure UI extension on which this extension relies.
@@ -108,8 +111,8 @@ export async function activate(context: vscode.ExtensionContext) {
         registerCommandWithTelemetry("aks.aksRetinaCapture", aksRetinaCapture);
         registerCommandWithTelemetry("aks.aksKaito", aksKaito);
         registerCommandWithTelemetry("aks.aksKaitoGenerateYaml", aksKaitoGenerateYaml);
-        registerCommandWithTelemetry("aks.getAzureKubernetesServicePlugins", getPlugins);
-
+        registerCommand("aks.getAzureKubernetesServicePlugins", () => getPlugins(experiementService));
+        
         await registerAzureServiceNodes(context);
 
         const azureAccountTreeItem = createAzureAccountTreeItem(sessionProvider);
